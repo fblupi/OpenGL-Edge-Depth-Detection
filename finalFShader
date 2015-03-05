@@ -1,0 +1,38 @@
+#version 130	
+
+uniform float time;
+uniform float width, height;
+uniform sampler2D renderedSceneTex;
+uniform sampler2D depthSceneTex;
+
+float threshold = 0.01;
+
+in vec2 fragCoord;
+vec2 pix = vec2((fragCoord.x+1.0)/2.0, (fragCoord.y+1.0)/2.0);
+
+int IsEdge(float depth, float radius)
+{
+	for(float i = -radius; i <= radius; ++i)
+	{
+		for(float j = -radius; j <= radius; ++j)
+		{
+			float stepx = i/width, stepy = j/height;
+			float neighbourDepth = texture(depthSceneTex, vec2(pix.x + stepx, pix.y + stepy)).x;
+			if(neighbourDepth - depth > threshold) return 1;
+		}
+	}
+	return 0;
+}
+
+void main()  
+{  
+    float depth = texture(depthSceneTex, pix).x;
+    float radius = clamp((sin(time) + 1.0) * 5 + 0.01, 1.0, 5.0);
+
+    if(IsEdge(depth, radius) == 1) gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+    else if(depth < 0.999) gl_FragColor = vec4(0.0, 0.0, 0.7, 1.0);
+    else gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+
+    //gl_FragColor = texture(renderedSceneTex, pix);
+}
+
