@@ -7,6 +7,7 @@
 #include <GL/glext.h>
 
 #include "../include/glm/glm.hpp"
+#include "../include/FileLoader.h"
 #include "../include/Shader.h"
 #include "../include/ShaderProgram.h"
 
@@ -26,7 +27,7 @@ const float screenMesh[18] = {-1.0f, -1.0f, 0.0f,
 
 
 
-const int width = 640, height = 480;
+const int width = 840, height = 680;
 
 GLuint vboId, vaoId, finalVboId, finalVaoId, frameBuffId, colorTexId, depthTexId,
        shaderProgramId, vShaderId, fShaderId;
@@ -34,11 +35,17 @@ GLuint vboId, vaoId, finalVboId, finalVaoId, frameBuffId, colorTexId, depthTexId
 Shader *vshader, *fshader, *finalVShader, *finalFShader;
 ShaderProgram *program, *finalProgram;
 
+vector<vec3> vertexPos, vertexNormals;
+vector<vec2> vertexUv;
+bool triangles;
+
 void Init()
 {
     glEnable(GL_DEPTH_TEST);
 
     glClearColor(0.0, 0.0, 0.0, 1.0);
+
+    ReadOBJ("luigi.obj", vertexPos, vertexUv, vertexNormals, triangles);
 
     //Creamos shaders
     vshader = new Shader(); if( !vshader->Create("vshader", VertexShader) ) std::cout << "FUUUU" << std::endl;
@@ -51,7 +58,7 @@ void Init()
     //Creamos vbo
     glGenBuffers(1, &vboId);
     glBindBuffer(GL_ARRAY_BUFFER, vboId);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(triMesh), triMesh, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * vertexPos.size(), &vertexPos[0], GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     //Creamos vao
@@ -81,7 +88,7 @@ void Init()
     glGenTextures(1, &depthTexId);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, depthTexId);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -135,9 +142,10 @@ void RenderScene()
     glDrawBuffer(GL_DEPTH_ATTACHMENT);
 
     mat4 transform(1.0f);
-    vec3 axis = vec3(0.0, 1.0, 0.0), translate(0.0, 0.0, -3.0), scale(0.5);
+    vec3 axis(0.0, 1.0, 0.0), axis2(1.0, 0.0, 0.0), translate(0.0, -2.0, -10.0), scale(0.03);
     mat4 T = glm::translate(transform, translate);
     mat4 R = glm::rotate_slow(transform, rot, axis);
+    mat4 R2 = glm::rotate_slow(transform, rot, axis2);
     mat4 S = glm::scale(transform, scale);
     transform = T * R * S;
 
@@ -148,7 +156,7 @@ void RenderScene()
     glUniformMatrix4fv(glGetUniformLocation(program->GetId(), "transform"), 1, GL_FALSE, value_ptr(transform));
     glUniformMatrix4fv(glGetUniformLocation(program->GetId(), "projection"), 1, GL_FALSE, value_ptr(projection));
 
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawArrays(triangles ? GL_TRIANGLES : GL_QUADS, 0, vertexPos.size());
 
     program->UnUse();
     glBindVertexArray(0);
@@ -177,7 +185,7 @@ void RenderScene()
     //////////////////////////////////
 
     appTime += 0.03;
-    rot += 0.09;
+    rot += 0.04;
 }
 
 

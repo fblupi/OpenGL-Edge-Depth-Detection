@@ -13,5 +13,6 @@ OTHER_FILES += \
 
 HEADERS += \
     include/ShaderProgram.h \
-    include/Shader.h
+    include/Shader.h \
+    include/FileLoader.h
 
