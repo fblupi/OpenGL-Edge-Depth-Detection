@@ -29,7 +29,7 @@ const float screenMesh[18] = {-1.0f, -1.0f, 0.0f,
 
 const int width = 840, height = 680;
 
-GLuint vboId, vaoId, finalVboId, finalVaoId, frameBuffId, colorTexId, depthTexId,
+GLuint vboId, vaoId, finalVboId, finalVaoId, frameBuffId, colorTexId, realTex, depthTexId,
        shaderProgramId, vShaderId, fShaderId;
 
 Shader *vshader, *fshader, *finalVShader, *finalFShader;
@@ -47,6 +47,12 @@ void Init()
 
     ReadOBJ("luigi.obj", vertexPos, vertexUv, vertexNormals, triangles);
 
+    int modelDataSize = vertexPos.size() * sizeof(vec3) + vertexUv.size() * sizeof(vec2);
+    int vertexUvOffset = vertexPos.size() * sizeof(vec3);
+    char *modelData = new char[modelDataSize];
+    memcpy(modelData, &vertexPos[0], vertexUvOffset);
+    memcpy((modelData + vertexUvOffset), &vertexUv[0], vertexUv.size() * sizeof(vec2));
+
     //Creamos shaders
     vshader = new Shader(); if( !vshader->Create("vshader", VertexShader) ) std::cout << "FUUUU" << std::endl;
     fshader = new Shader(); if( !fshader->Create("fshader", FragmentShader) ) std::cout << "FUUUU" << std::endl;
@@ -58,18 +64,41 @@ void Init()
     //Creamos vbo
     glGenBuffers(1, &vboId);
     glBindBuffer(GL_ARRAY_BUFFER, vboId);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * vertexPos.size(), &vertexPos[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertexPos.size() * sizeof(vec3) + vertexUv.size() * sizeof(vec2), &modelData[0], GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    //real texture
+    glGenTextures(1, &realTex);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, realTex);
+    unsigned char *data = 0;
+    int n, texWidth, texHeight;
+    data = ReadTexture("luigiD.jpg", n, texWidth, texHeight);
+    glTexImage2D(GL_TEXTURE_2D, 0, (n == 4 ? GL_RGBA : GL_RGB), texWidth, texHeight, 0,
+                 (n == 4 ? GL_RGBA : GL_RGB), GL_UNSIGNED_BYTE, data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
     //Creamos vao
     glEnableClientState(GL_VERTEX_ARRAY);
-    glGenVertexArrays(1, &vaoId);
-    glBindVertexArray(vaoId);
-    glBindBuffer(GL_ARRAY_BUFFER, vboId);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(glGetAttribLocation(program->GetId(), "position"));
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+        glGenVertexArrays(1, &vaoId);
+
+        glBindVertexArray(vaoId);
+
+            glBindBuffer(GL_ARRAY_BUFFER, vboId);
+
+                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+                glEnableVertexAttribArray(0);
+
+                glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void*) (vertexPos.size() * sizeof(vec3)));
+                glEnableVertexAttribArray(1);
+
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        glBindVertexArray(0);
     glDisableClientState(GL_VERTEX_ARRAY);
 
     /// Creamos framebuffer/////
@@ -138,6 +167,7 @@ void RenderScene()
     glBindVertexArray(vaoId);
     program->Use();
 
+    glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, realTex);
     glDrawBuffer(GL_COLOR_ATTACHMENT0);
     glDrawBuffer(GL_DEPTH_ATTACHMENT);
 
@@ -153,12 +183,14 @@ void RenderScene()
     projection = perspective(45.0f * 3.1415f/180.0f, 1.0f, 0.1f, 100.0f);
 
     glUniform1f(glGetUniformLocation(program->GetId(), "time"), appTime);
+    glUniform1i(glGetUniformLocation(program->GetId(), "realTex"), 2);
     glUniformMatrix4fv(glGetUniformLocation(program->GetId(), "transform"), 1, GL_FALSE, value_ptr(transform));
     glUniformMatrix4fv(glGetUniformLocation(program->GetId(), "projection"), 1, GL_FALSE, value_ptr(projection));
 
     glDrawArrays(triangles ? GL_TRIANGLES : GL_QUADS, 0, vertexPos.size());
 
     program->UnUse();
+    glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, 0);
     glBindVertexArray(0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
